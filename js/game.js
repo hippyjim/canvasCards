@@ -23,9 +23,10 @@ $(function() {
     // Suit is "true" if red, "false" if black
     var suits = {};
     suits[SUIT_HEARTS] = true;
+    suits[SUIT_CLUBS] = false;
     suits[SUIT_DIAMONDS] = true;
     suits[SUIT_SPADES] = false;
-    suits[SUIT_CLUBS] = false;
+
 
     var numberNames = {};
     numberNames[CARD_ACE] = 'Ace';
@@ -60,6 +61,54 @@ $(function() {
         13:{pixelsLeft: 140, pixelsTop: 950}
     };
 
+    deckSprites[SUIT_CLUBS] = {
+        1:{pixelsLeft: 560, pixelsTop: 570},
+        2:{pixelsLeft: 280, pixelsTop: 1140},
+        3:{pixelsLeft: 700, pixelsTop: 190},
+        4:{pixelsLeft: 700, pixelsTop: 0},
+        5:{pixelsLeft: 560, pixelsTop: 1710},
+        6:{pixelsLeft: 560, pixelsTop: 1520},
+        7:{pixelsLeft: 560, pixelsTop: 1330},
+        8:{pixelsLeft: 560, pixelsTop: 1140},
+        9:{pixelsLeft: 560, pixelsTop: 950},
+        10:{pixelsLeft: 560, pixelsTop: 760},
+        11:{pixelsLeft: 560, pixelsTop: 380},
+        12:{pixelsLeft: 560, pixelsTop: 0},
+        13:{pixelsLeft: 560, pixelsTop: 190}
+    };
+
+    deckSprites[SUIT_DIAMONDS] = {
+        1:{pixelsLeft: 420, pixelsTop: 0},
+        2:{pixelsLeft: 420, pixelsTop: 1710},
+        3:{pixelsLeft: 420, pixelsTop: 1520},
+        4:{pixelsLeft: 420, pixelsTop: 1330},
+        5:{pixelsLeft: 420, pixelsTop: 1140},
+        6:{pixelsLeft: 420, pixelsTop: 950},
+        7:{pixelsLeft: 420, pixelsTop: 760},
+        8:{pixelsLeft: 420, pixelsTop: 570},
+        9:{pixelsLeft: 420, pixelsTop: 380},
+        10:{pixelsLeft: 420, pixelsTop: 190},
+        11:{pixelsLeft: 280, pixelsTop: 1710},
+        12:{pixelsLeft: 280, pixelsTop: 1330},
+        13:{pixelsLeft: 280, pixelsTop: 1520}
+    };
+
+    deckSprites[SUIT_SPADES] = {
+        1:{pixelsLeft: 0, pixelsTop: 570},
+        2:{pixelsLeft: 140, pixelsTop: 380},
+        3:{pixelsLeft: 140, pixelsTop: 190},
+        4:{pixelsLeft: 140, pixelsTop: 0},
+        5:{pixelsLeft: 0, pixelsTop: 1710},
+        6:{pixelsLeft: 0, pixelsTop: 1520},
+        7:{pixelsLeft: 0, pixelsTop: 1330},
+        8:{pixelsLeft: 0, pixelsTop: 1140},
+        9:{pixelsLeft: 0, pixelsTop: 950},
+        10:{pixelsLeft: 0, pixelsTop: 760},
+        11:{pixelsLeft: 0, pixelsTop: 380},
+        12:{pixelsLeft: 0, pixelsTop: 0},
+        13:{pixelsLeft: 0, pixelsTop: 190}
+    };
+
     var cardSpritesLoaded = false;
     var cardSpritesImage = new Image();
     cardSpritesImage.src = '/img/playingCards.png';
@@ -84,6 +133,7 @@ $(function() {
         this.suit = suit;
         this.x = x;
         this.y = y;
+        this.visible = false;
         this.faceUp = faceUp;
         this.cardSprite = deckSprites[this.suit][this.number];
     }
@@ -95,7 +145,7 @@ $(function() {
             return this;
         },
         draw: function(){
-            if (this.x <= playingTable.width) {
+            if (this.visible && this.x <= playingTable.width) {
                 //TODO: handle the card being face down by using a different image
                 context.drawImage(
                     cardSpritesImage,
@@ -164,10 +214,21 @@ $(function() {
         var currentY = startY;
 
         Object.keys(cards).forEach(function(card) {
-
             cards[card].setPosition(currentX, currentY);
             currentX+=offsetX;
             currentY+=offsetY;
+        });
+    }
+
+    function show(cards) {
+        Object.keys(cards).forEach(function(card) {
+            cards[card].visible = true;
+        });
+    }
+
+    function hide(cards) {
+        Object.keys(cards).forEach(function(card) {
+            cards[card].visible = false;
         });
     }
 
@@ -178,7 +239,7 @@ $(function() {
         for (var number in numberNames) {
             //TODO: Once we can handle face down cards, they should probably be face down first
 
-            //For now, let's only make cards we've defined sprite data for
+            //Let's only make cards we've defined sprite data for
             if (deckSprites[suit] != undefined && deckSprites[suit][number] != undefined) {
                 deck[suit][number] = new Card(number, suit, 20, 20, true);
             }
@@ -191,28 +252,44 @@ $(function() {
     var tableHeight = playingTable.height;
     var context = playingTable.getContext('2d');
 
-    fan(deck[SUIT_HEARTS], 20, 20, 15, 15);
+    fan(deck[SUIT_HEARTS], 20, 20, 15, 0);
+    fan(deck[SUIT_CLUBS], 20, cardHeight+40, 15, 0);
+    fan(deck[SUIT_DIAMONDS], 20, (cardHeight*2)+60, 15, 0);
+    fan(deck[SUIT_SPADES], 20, (cardHeight*3)+80, 15, 0);
+    show(deck[SUIT_HEARTS]);
+    show(deck[SUIT_CLUBS]);
+    show(deck[SUIT_DIAMONDS]);
+    show(deck[SUIT_SPADES]);
+
     render();
     var cardToAnimate = CARD_KING;
+    var deckToAnimate = SUIT_HEARTS;
 
+    //TODO: Look at allowing user to click any card and have it animate
+    // Then look at how to check if card is on top - we need a z-axis or some other way of knowing which is on top of a stack
     var animationStarted = false;
     playingTable.onclick = function(event) {
         if (!animationStarted) {
-            if (deck[SUIT_HEARTS][cardToAnimate].mouseIsOnMe(event)) {
+            if (deck[deckToAnimate][cardToAnimate].mouseIsOnMe(event)) {
                 animationStarted = true;
                 var animateCardsIntervalHandle = setInterval(function(){
-                    deck[SUIT_HEARTS][cardToAnimate].x+=5;
+                    deck[deckToAnimate][cardToAnimate].x+=8;
                     render();
-                    if(!deck[SUIT_HEARTS][cardToAnimate].isOnTable()) {
-                        clearInterval(animateCardsIntervalHandle);
+                    if(!deck[deckToAnimate][cardToAnimate].isOnTable()) {
                         animationStarted = false;
+                        clearInterval(animateCardsIntervalHandle);
                         cardToAnimate--;
                         if (cardToAnimate < 1) {
-                            context.fillStyle = "rgb(250, 250, 250)";
-                            context.font = "24px Arial";
-                            context.textAlign = "center";
-                            context.textBaseline = "top";
-                            context.fillText("Done", tableWidth/2, (tableHeight/2)-12);
+                            if(deckToAnimate == SUIT_HEARTS) {
+                                deckToAnimate = SUIT_DIAMONDS;
+                                cardToAnimate = CARD_KING;
+                            } else {
+                                context.fillStyle = "rgb(250, 250, 250)";
+                                context.font = "24px Arial";
+                                context.textAlign = "center";
+                                context.textBaseline = "top";
+                                context.fillText("Done", tableWidth/2, (tableHeight/2)-12);
+                            }
                         }
                     }
                 }, 2);
