@@ -1,0 +1,9 @@
+body {
+    background-color: #DDD;
+}
+
+#playingTable {
+    margin: auto;
+    background-color: #FFF;
+    border: 2px solid #000;
+}
