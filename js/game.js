@@ -5,7 +5,6 @@ $(function() {
     var SUIT_SPADES = 'Spades';
     var SUIT_CLUBS = 'Clubs';
 
-
     var CARD_ACE = 1;
     var CARD_TWO = 2;
     var CARD_THREE = 3;
@@ -130,13 +129,15 @@ $(function() {
         return position;
     }
 
-    function Card(number, suit, x, y, faceUp) {
+    function Card(number, suit, x, y, z, faceUp) {
         this.number = number;
         this.suit = suit;
         this.x = x;
         this.y = y;
         this.visible = false;
         this.faceUp = faceUp;
+        this.mousePositionX = false;
+        this.mousePositionY = false;
         this.cardSprite = deckSprites[this.suit][this.number];
     }
 
@@ -175,9 +176,14 @@ $(function() {
         mouseIsOnMe: function(event){
 
             var mousePosition = getMousePositionOnCanvas(playingTable, event);
-            if (mousePosition.x >= this.x && mousePosition.x <= (this.x+cardWidth) && mousePosition.y >= this.y && mousePosition.y <= (this.y+cardHeight)) {
+            this.mousePositionX = (mousePosition.x - this.x);
+            this.mousePositionY = (mousePosition.y - this.y);
+            if (this.mousePositionX >= 0 && this.mousePositionX <= cardWidth && this.mousePositionY >= 0 && this.mousePositionY <= cardHeight) {
                 return true;
             }
+
+            this.mousePositionX = false;
+            this.mousePositionY = false;
             return false;
         },
         canStackOnCardInTableau: function(card) {
@@ -201,13 +207,11 @@ $(function() {
         context.closePath();
         context.fill();
 
-        Object.keys(deck).forEach(function(suit) {
-            Object.keys(deck[suit]).forEach(function(cardNum){
-                if (deck[suit].hasOwnProperty(cardNum)){
-                    deck[suit][cardNum].draw();
-                }
-            });
-        });
+        for(var cardIndex in cardsOnTable) {
+            if (cardsOnTable[cardIndex] instanceof Card) {
+                cardsOnTable[cardIndex].draw();
+            }
+        }
     }
 
     function fan(cards, startX, startY, offsetX, offsetY) {
@@ -238,15 +242,14 @@ $(function() {
 
         var cardThatIsClicked = false;
 
-        Object.keys(deck).forEach(function(suit) {
-            Object.keys(deck[suit]).forEach(function(cardNum){
-                if (deck[suit].hasOwnProperty(cardNum)){
-                    if(deck[suit][cardNum].mouseIsOnMe(event)) {
-                        cardThatIsClicked = deck[suit][cardNum];
-                    }
-                }
-            });
-        });
+        var cardsBackwards = cardsOnTable.slice(0).reverse();
+
+        for(var cardIndex in cardsBackwards) {
+            if (cardsBackwards[cardIndex].mouseIsOnMe(event)) {
+                cardThatIsClicked = cardsBackwards[cardIndex];
+                break;
+            }
+        }
 
         return cardThatIsClicked;
     }
@@ -254,20 +257,28 @@ $(function() {
     function numberOfVisibleCards() {
         var numberOfCards = 0;
 
-        Object.keys(deck).forEach(function(suit) {
-            Object.keys(deck[suit]).forEach(function(cardNum){
-                if (deck[suit].hasOwnProperty(cardNum)){
-                    if(deck[suit][cardNum].isOnTable()) {
-                        numberOfCards++;
-                    }
-                }
-            });
-        });
+        for(var cardIndex in cardsOnTable) {
+            if (cardsOnTable[cardIndex].isOnTable()) {
+                numberOfCards++;
+            }
+        }
 
         return numberOfCards;
     }
 
+    function findCardInStack(card, stack) {
+        var foundCardIndex = false;
+        for (var cardIndex in stack) {
+            if (card.suit == stack[cardIndex].suit && card.number == stack[cardIndex].number) {
+                foundCardIndex = cardIndex;
+                break;
+            }
+        }
+        return foundCardIndex;
+    }
+
     var deck = {};
+    var cardsOnTable = [];
 
     for (var suit in suits) {
         deck[suit] = {};
@@ -277,6 +288,7 @@ $(function() {
             //Let's only make cards we've defined sprite data for
             if (deckSprites[suit] != undefined && deckSprites[suit][number] != undefined) {
                 deck[suit][number] = new Card(number, suit, 20, 20, true);
+                cardsOnTable.push(deck[suit][number]);
             }
         }
     }
@@ -286,6 +298,8 @@ $(function() {
     var tableWidth = playingTable.width;
     var tableHeight = playingTable.height;
     var context = playingTable.getContext('2d');
+    var animationStarted = false;
+    var cardBeingDragged = false;
 
     function init() {
         if (Object.keys(assets).length != loadedAssets) {
@@ -296,17 +310,14 @@ $(function() {
         fan(deck[SUIT_CLUBS], 20, cardHeight+40, 15, 0);
         fan(deck[SUIT_DIAMONDS], 20, (cardHeight*2)+60, 15, 0);
         fan(deck[SUIT_SPADES], 20, (cardHeight*3)+80, 15, 0);
-        show(deck[SUIT_HEARTS]);
-        show(deck[SUIT_CLUBS]);
-        show(deck[SUIT_DIAMONDS]);
-        show(deck[SUIT_SPADES]);
+        show(cardsOnTable);
 
         render();
 
         //TODO: Look at how to check if card is on top - we need a z-axis or some other way of knowing which is on top of a stack
         // We also need to look at draw order so lower cards are drawn/rendered first
-        var animationStarted = false;
-        playingTable.onclick = function (event) {
+
+        playingTable.ondblclick = function (event) {
             if (!animationStarted) {
                 var cardThatIsClicked = whichCardIsClicked(event);
                 if (cardThatIsClicked) {
@@ -333,7 +344,39 @@ $(function() {
                 }
             }
         };
+
+        playingTable.onmousedown = function(event) {
+            if (!animationStarted) {
+                cardBeingDragged = whichCardIsClicked(event);
+                var cardIndex = findCardInStack(cardBeingDragged, cardsOnTable);
+                cardsOnTable.move(cardIndex, cardsOnTable.length-1);
+            }
+        };
+
+        playingTable.onmousemove = function(event) {
+            if (!animationStarted) {
+                if (cardBeingDragged) {
+                    var mousePosition = getMousePositionOnCanvas(playingTable, event);
+                    cardBeingDragged.setPosition(mousePosition.x-cardBeingDragged.mousePositionX, mousePosition.y-cardBeingDragged.mousePositionY);
+                    render(); //This might make it jerky
+                }
+            }
+        };
+
+        playingTable.onmouseup = function(event) {
+            cardBeingDragged = false;
+        };
     }
 
     init();
 });
+
+Array.prototype.move = function (old_index, new_index) {
+    if (new_index >= this.length) {
+        var k = new_index - this.length;
+        while ((k--) + 1) {
+            this.push(undefined);
+        }
+    }
+    this.splice(new_index, 0, this.splice(old_index, 1)[0]);
+};
