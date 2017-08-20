@@ -109,10 +109,12 @@ $(function() {
         13:{pixelsLeft: 0, pixelsTop: 190}
     };
 
-    var cardSpritesLoaded = false;
-    var cardSpritesImage = new Image();
-    cardSpritesImage.src = '/img/playingCards.png';
-    cardSpritesImage.onload = function(){ cardSpritesLoaded = true; };
+    var loadedAssets = 0;
+    var assets = {};
+
+    assets.cardSpritesImage = new Image();
+    assets.cardSpritesImage.src = '/img/playingCards.png';
+    assets.cardSpritesImage.onload = function(){ loadedAssets++; };
 
     var spriteWidth  = 140;
     var spriteHeight = 190;
@@ -148,7 +150,7 @@ $(function() {
             if (this.visible && this.x <= playingTable.width) {
                 //TODO: handle the card being face down by using a different image
                 context.drawImage(
-                    cardSpritesImage,
+                    assets.cardSpritesImage,
                     this.cardSprite.pixelsLeft,
                     this.cardSprite.pixelsTop,
                     spriteWidth,
@@ -232,6 +234,39 @@ $(function() {
         });
     }
 
+    function whichCardIsClicked(event) {
+
+        var cardThatIsClicked = false;
+
+        Object.keys(deck).forEach(function(suit) {
+            Object.keys(deck[suit]).forEach(function(cardNum){
+                if (deck[suit].hasOwnProperty(cardNum)){
+                    if(deck[suit][cardNum].mouseIsOnMe(event)) {
+                        cardThatIsClicked = deck[suit][cardNum];
+                    }
+                }
+            });
+        });
+
+        return cardThatIsClicked;
+    }
+
+    function numberOfVisibleCards() {
+        var numberOfCards = 0;
+
+        Object.keys(deck).forEach(function(suit) {
+            Object.keys(deck[suit]).forEach(function(cardNum){
+                if (deck[suit].hasOwnProperty(cardNum)){
+                    if(deck[suit][cardNum].isOnTable()) {
+                        numberOfCards++;
+                    }
+                }
+            });
+        });
+
+        return numberOfCards;
+    }
+
     var deck = {};
 
     for (var suit in suits) {
@@ -252,48 +287,53 @@ $(function() {
     var tableHeight = playingTable.height;
     var context = playingTable.getContext('2d');
 
-    fan(deck[SUIT_HEARTS], 20, 20, 15, 0);
-    fan(deck[SUIT_CLUBS], 20, cardHeight+40, 15, 0);
-    fan(deck[SUIT_DIAMONDS], 20, (cardHeight*2)+60, 15, 0);
-    fan(deck[SUIT_SPADES], 20, (cardHeight*3)+80, 15, 0);
-    show(deck[SUIT_HEARTS]);
-    show(deck[SUIT_CLUBS]);
-    show(deck[SUIT_DIAMONDS]);
-    show(deck[SUIT_SPADES]);
+    function init() {
+        if (Object.keys(assets).length != loadedAssets) {
+            setTimeout(init, 10);
+        }
 
-    render();
-    var cardToAnimate = CARD_KING;
-    var deckToAnimate = SUIT_HEARTS;
+        fan(deck[SUIT_HEARTS], 20, 20, 15, 0);
+        fan(deck[SUIT_CLUBS], 20, cardHeight+40, 15, 0);
+        fan(deck[SUIT_DIAMONDS], 20, (cardHeight*2)+60, 15, 0);
+        fan(deck[SUIT_SPADES], 20, (cardHeight*3)+80, 15, 0);
+        show(deck[SUIT_HEARTS]);
+        show(deck[SUIT_CLUBS]);
+        show(deck[SUIT_DIAMONDS]);
+        show(deck[SUIT_SPADES]);
 
-    //TODO: Look at allowing user to click any card and have it animate
-    // Then look at how to check if card is on top - we need a z-axis or some other way of knowing which is on top of a stack
-    var animationStarted = false;
-    playingTable.onclick = function(event) {
-        if (!animationStarted) {
-            if (deck[deckToAnimate][cardToAnimate].mouseIsOnMe(event)) {
-                animationStarted = true;
-                var animateCardsIntervalHandle = setInterval(function(){
-                    deck[deckToAnimate][cardToAnimate].x+=8;
-                    render();
-                    if(!deck[deckToAnimate][cardToAnimate].isOnTable()) {
-                        animationStarted = false;
-                        clearInterval(animateCardsIntervalHandle);
-                        cardToAnimate--;
-                        if (cardToAnimate < 1) {
-                            if(deckToAnimate == SUIT_HEARTS) {
-                                deckToAnimate = SUIT_DIAMONDS;
-                                cardToAnimate = CARD_KING;
-                            } else {
+        render();
+
+        //TODO: Look at how to check if card is on top - we need a z-axis or some other way of knowing which is on top of a stack
+        // We also need to look at draw order so lower cards are drawn/rendered first
+        var animationStarted = false;
+        playingTable.onclick = function (event) {
+            if (!animationStarted) {
+                var cardThatIsClicked = whichCardIsClicked(event);
+                if (cardThatIsClicked) {
+                    animationStarted = true; //Only animate one at a time
+                    var animateCardsIntervalHandle = setInterval(function () {
+                        cardThatIsClicked.x += 8;
+                        render();
+                        if (!cardThatIsClicked.isOnTable()) {
+                            animationStarted = false;
+                            clearInterval(animateCardsIntervalHandle);
+
+                            if (numberOfVisibleCards() == 0) {
+                                animationStarted = true;
                                 context.fillStyle = "rgb(250, 250, 250)";
                                 context.font = "24px Arial";
                                 context.textAlign = "center";
                                 context.textBaseline = "top";
-                                context.fillText("Done", tableWidth/2, (tableHeight/2)-12);
+                                context.fillText("Resetting...", tableWidth / 2, (tableHeight / 2) - 12);
+                                //TODO: Look at resetting
+                                setTimeout(init, 3000);
                             }
                         }
-                    }
-                }, 2);
+                    }, 2);
+                }
             }
-        }
-    };
+        };
+    }
+
+    init();
 });
